@@ -1,4 +1,6 @@
-# Viva USB: standard persona + Viva Link (patch 0182)
+# Viva USB: standard persona + Viva Link
+
+This describes the interface introduced in patch 0182. Later patches or the installed userspace daemon may change behavior; check the current source and device before relying on it.
 
 Contract between the kernel (`bsd/dev/viva_usb.c`), the phone daemon `vivausbd` (tools/vivad/vivausbd.c),
 the host tool (`tools/viva-link.py`) and the SpringBoard tweak (Viva Manager, gpu/app/tweak).

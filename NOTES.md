@@ -3,11 +3,13 @@
 This repository targets Redmi Note 11 Pro 4G (`viva`, MT6781). The `sweet` notes below are historical upstream material for a different Qualcomm device, not the active Viva handoff. See [VIVA.md](VIVA.md) for the engineering history and [README.md](README.md) for navigation.
 
 - Source HEAD when reviewed: `048c3ba` (camera OSData header fix), following `3a029c1` (camera 0234–0236 and Wi-Fi 0237) and `7dac55c` (Bluetooth 0231–0233). Patch 0238 is present. These commits alone do not establish a successful build or device boot. No CI run or boot was performed during this documentation review.
-- The pre-existing local snapshot `docs/VIVA_STATUS_2026-11-21.md` describes a Wi-Fi connection with IRQ storm fallback to polling and a measured ~60 Hz display despite 120 Hz mode. Its patch/commit inventory predates the above commits; treat its numbers as a dated snapshot, not current device state. Local Bluetooth and camera work remains unverified on the running kernel.
-- Earlier Viva engineering notes report audio output and haptics tested by the user; re-check on the current boot before claiming their present status. Do not infer device capabilities from patches alone.
+- A 2026-11-21 diagnostic snapshot described a Wi-Fi connection with IRQ storm fallback to polling and a measured ~60 Hz display despite 120 Hz mode. Treat these as dated observations, not current device state. Local Bluetooth and camera work remains unverified on the running kernel.
+- Earlier Viva engineering notes report audio output and haptics tested. Re-check on the current boot before claiming their present status. Do not infer device capabilities from patches alone.
 - Next: identify the running kernel and its matching ADT, verify a clean build of the desired patch stack, then gather read-only Wi-Fi IRQ diagnostics and camera/BT registration evidence. Keep build and boot results and any CI run ID in this handoff.
-- `../ios-assets/` holds local images, IPSW-derived files, handoff material and logs; preserve it outside Git. `../diagnostics-private/` holds private diagnostics. Existing uncommitted source/tools and documentation are user work and were not included in the documentation commit.
+- `../ios-assets/` holds local images, IPSW-derived files, handoff material and logs; preserve it outside Git. `../diagnostics-private/` holds private diagnostics. Existing uncommitted source and tools are user work.
 - Device policy: temporary boot images for bring-up; confirm each destructive step with the user. The user previously approved using existing `userdata` for iOS, without GPT changes. Preserve bootloaders, recovery, modem, persist and backups.
+
+- Documentation cleanup: replaced the obsolete Italian GPU proposal with an English overview; removed the local-only status and workflow drafts from `docs/`, retained the QEMU guide with its sweet-only scope, and labeled the USB contract as historical. No build, CI run or device boot was performed for this cleanup.
 
 ---
 
