@@ -1,0 +1,21 @@
+diff --git a/tools/mkadt.py b/tools/mkadt.py
+--- a/tools/mkadt.py
++++ b/tools/mkadt.py
+@@ -348,8 +348,17 @@
+                         0x10006000 - SOC_BASE, 0x1000, 0x10000000 - SOC_BASE, 0x1000,
+                         0x1000c000 - SOC_BASE, 0x1000, 0x10001000 - SOC_BASE, 0x1000)),
+             ('interrupt-parent', u32(gic_ph)),
+             ('interrupts', spi(0x112, IRQ_LEVEL_HIGH) + spi(0x113, IRQ_LEVEL_HIGH) + spi(0x114, IRQ_LEVEL_HIGH)),
++        ]),
++        # Camera stage 0. IOKit enumeration only; registers are described but never mapped/read.
++        # No GPIO, clock, I2C or regulator writes are permitted by the stage-0 driver.
++        node('camera-probe', [
++            ph(),
++            ('compatible', cstr('mediatek,mt6781-camera-probe')),
++            ('reg', io(0x1a000000, 0x1000) + io(0x1a04f000, 0x1000) +
++                    io(0x1a06f000, 0x1000)),
++            ('probe-only', u32(1)),
+         ]),
+         # CONNSYS WiFi (MT6781 + MT6631): iokit/Kernel/arm/VivaWLAN.cpp (registry for configd / wifid) on top of
+         # bsd/dev/viva_wifi.c + viva_wlan.c (the station, en0). launchd starts wifid only when a node named "wlan"
+         # exists (_LimitLoadToDeviceTree); MobileGestalt reads local-mac-address here.

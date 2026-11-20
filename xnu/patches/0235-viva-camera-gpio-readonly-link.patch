@@ -1,0 +1,132 @@
+diff --git a/bsd/dev/viva_usb.c b/bsd/dev/viva_usb.c
+--- a/bsd/dev/viva_usb.c
++++ b/bsd/dev/viva_usb.c
+@@ -263,9 +263,10 @@
+ extern void sweet_kill(const char *arg, char *out, size_t len);
+ extern void sweet_surface_report(const char *arg, char *out, size_t len);     /* iokit/Kernel/arm/SweetSurface.cpp (0206) */
+ extern void viva_iobmd_report(const char *arg, char *out, size_t len);        /* iokit/Kernel/IOBufferMemoryDescriptor.cpp (0208) */
+ extern void viva_haptic_link(const char *args, char *out, size_t len);        /* iokit/Kernel/arm/VivaHaptic.cpp (0220) */
+-extern void viva_audio_link(const char *args, char *out, size_t len);         /* iokit/Kernel/arm/VivaAudio.cpp (0222) */
++extern void viva_audio_link(const char *args, char *out, size_t len);
++extern void viva_camera_link(const char *args, char *out, size_t len); /* stage 0235; read-only */         /* iokit/Kernel/arm/VivaAudio.cpp (0222) */
+ 
+ extern void viva_battery_usb_changed(void);                                  /* VivaBattery.cpp: poll now */
+ 
+ #define VL_TOOL_MS      4000            /* the link is active this long after the last heartbeat */
+@@ -1777,8 +1778,12 @@
+ 	} else if (IS("aud")) {
+ 		char out[400];
+ 		viva_audio_link(rest, out, sizeof(out));
+ 		vl_reply("%s", out);
++	} else if (IS("cam")) {
++		char out[512];
++		viva_camera_link(rest, out, sizeof(out));
++		vl_reply("%s", out);
+ 	} else if (IS("iobmd")) {
+ 		char out[240];
+ 		while (*rest == ' ') {
+ 			rest++;
+diff --git a/iokit/Kernel/arm/VivaCamera.cpp b/iokit/Kernel/arm/VivaCamera.cpp
+--- a/iokit/Kernel/arm/VivaCamera.cpp
++++ b/iokit/Kernel/arm/VivaCamera.cpp
+@@ -10,16 +10,21 @@
+ #if defined(SWEET)
+ #include <IOKit/IOLib.h>
+ #include <IOKit/IOService.h>
+ #include <libkern/OSData.h>
++#include <libkern/libkern.h>
++#include "VivaIO.h"
+ 
+ class VivaCamera : public IOService {
+     OSDeclareDefaultStructors(VivaCamera);
+ public:
+     virtual bool start(IOService *provider) APPLE_KEXT_OVERRIDE;
+ };
+ 
+ OSDefineMetaClassAndStructors(VivaCamera, IOService);
++
++/* Set only after stage-0 safety validation; no automatic hardware access. */
++static VivaCamera *gVivaCamera;
+ 
+ bool
+ VivaCamera::start(IOService *provider)
+ {
+@@ -32,10 +37,76 @@
+         IOLog("VIVA CAM: missing stage-0 safety property, refusing start\n");
+         return false;
+     }
+ 
+-    setProperty("VivaCameraStage", "enumeration-only");
+-    IOLog("VIVA CAM: stage 0 registered (no MMIO, GPIO, I2C or power operations)\n");
++    setProperty("VivaCameraStage", "gpio-readonly-on-request");
++    IOLog("VIVA CAM: stage 1 registered; GPIO snapshot only when requested via link\n");
++    gVivaCamera = this;
+     registerService();
+     return true;
+ }
++
++/*
++ * USB link command: cam status | cam pins
++ * This code never changes GPIO direction, mux, output level, clocks,
++ * regulators, I2C state or camera hardware registers. It uses only the
++ * existing VivaGPIO::getMode/getInput read-only accessors.
++ *
++ * Sampled DIN bits need not be actual sensor rail voltages. In an alternate
++ * pinmux they may be unrelated to electrical pin levels.
++ */
++extern "C" void
++viva_camera_link(const char *args, char *out, size_t len)
++{
++    if (out == NULL || len == 0)
++        return;
++    out[0] = 0;
++    if (gVivaCamera == NULL) {
++        snprintf(out, len, "cam: driver not registered (stage 0234/0235 not in booted kernel)\n");
++        return;
++    }
++    if (args == NULL)
++        args = "";
++    while (*args == ' ')
++        args++;
++    if (*args == 0 || strcmp(args, "status") == 0) {
++        snprintf(out, len, "cam: stage 1 ready; no sensor power, I2C or ISP access; run cam pins\n");
++        return;
++    }
++    if (strcmp(args, "pins") != 0) {
++        snprintf(out, len, "cam: usage: cam status | cam pins (read only)\n");
++        return;
++    }
++
++    /* Only an explicit 'cam pins' triggers reads; no work in start(). */
++    VivaGPIO *gpio = VivaGPIO::wait();
++    if (gpio == NULL) {
++        snprintf(out, len, "cam: VivaGPIO not available\n");
++        return;
++    }
++    static const struct {
++        const char *name;
++        uint32_t pin;
++    } pins[] = {
++        { "RST", 18 }, { "PDN", 164 }, { "DVDD_EN", 74 },
++        { "AVDD_EN", 6 }, { "DOVDD_EN", 170 }, { "MCLK", 140 },
++    };
++    size_t used = 0;
++    int n = snprintf(out, len, "cam: MAIN GPIO read-only snapshot (mode, DIN)\n");
++    if (n < 0 || (size_t)n >= len)
++        return;
++    used = (size_t)n;
++    for (unsigned int i = 0; i < sizeof(pins) / sizeof(pins[0]); i++) {
++        uint32_t mode = 0;
++        bool level = false;
++        IOReturn m = gpio->getMode(pins[i].pin, &mode);
++        IOReturn v = gpio->getInput(pins[i].pin, &level);
++        n = snprintf(out + used, len - used,
++            "  GPIO%u %-8s mode=%u DIN=%u (%s)\n",
++            pins[i].pin, pins[i].name, mode, level ? 1 : 0,
++            (m == kIOReturnSuccess && v == kIOReturnSuccess) ? "ok" : "read-failed");
++        if (n < 0 || (size_t)n >= len - used)
++            return;
++        used += (size_t)n;
++    }
++}
+ #endif /* SWEET */

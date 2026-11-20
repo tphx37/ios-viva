@@ -1,0 +1,76 @@
+diff --git a/iokit/Kernel/arm/VivaCamera.cpp b/iokit/Kernel/arm/VivaCamera.cpp
+new file mode 100644
+--- /dev/null
++++ b/iokit/Kernel/arm/VivaCamera.cpp
+@@ -0,0 +1,41 @@
++/*
++ * viva (MT6781): camera hardware enumeration, stage 0.
++ *
++ * This is deliberately metadata-only. Do not map CAMSYS, touch the PMIC,
++ * configure clocks/GPIO, or communicate with the image sensor at this stage.
++ * A later patch can add guarded and explicitly enabled hardware bring-up.
++ */
++#include <pexpert/arm64/board_config.h>
++
++#if defined(SWEET)
++#include <IOKit/IOLib.h>
++#include <IOKit/IOService.h>
++#include <libkern/OSData.h>
++
++class VivaCamera : public IOService {
++    OSDeclareDefaultStructors(VivaCamera);
++public:
++    virtual bool start(IOService *provider) APPLE_KEXT_OVERRIDE;
++};
++
++OSDefineMetaClassAndStructors(VivaCamera, IOService);
++
++bool
++VivaCamera::start(IOService *provider)
++{
++    if (!IOService::start(provider))
++        return false;
++
++    OSData *readonly = OSDynamicCast(OSData, provider->getProperty("probe-only"));
++    if (readonly == NULL || readonly->getLength() != sizeof(uint32_t) ||
++        *(const uint32_t *)readonly->getBytesNoCopy() != 1) {
++        IOLog("VIVA CAM: missing stage-0 safety property, refusing start\n");
++        return false;
++    }
++
++    setProperty("VivaCameraStage", "enumeration-only");
++    IOLog("VIVA CAM: stage 0 registered (no MMIO, GPIO, I2C or power operations)\n");
++    registerService();
++    return true;
++}
++#endif /* SWEET */
+diff --git a/iokit/KernelConfigTables.cpp b/iokit/KernelConfigTables.cpp
+--- a/iokit/KernelConfigTables.cpp
++++ b/iokit/KernelConfigTables.cpp
+@@ -132,8 +132,13 @@
+     "     'IOProviderClass' = IOPlatformDevice;"
+     "     'IONameMatch'     = 'mediatek,mt6781-afe';"
+     "   },"
+     "   {"
++    "     'IOClass'         = VivaCamera;"
++    "     'IOProviderClass' = IOPlatformDevice;"
++    "     'IONameMatch'     = 'mediatek,mt6781-camera-probe';"
++    "   },"
++    "   {"
+     "     'IOClass'         = VivaWLAN;"
+     "     'IOProviderClass' = IOPlatformDevice;"
+     "     'IONameMatch'     = 'mediatek,mt6781-wlan';"
+     "   },"
+diff --git a/iokit/conf/files.arm64 b/iokit/conf/files.arm64
+--- a/iokit/conf/files.arm64
++++ b/iokit/conf/files.arm64
+@@ -27,8 +27,9 @@
+ iokit/Kernel/arm/VivaBattery.cpp                                 optional iokitcpp
+ iokit/Kernel/arm/VivaHaptic.cpp                                  optional iokitcpp
+ iokit/Kernel/arm/VivaAudio.cpp                                   optional iokitcpp
+ iokit/Kernel/arm/VivaWiFi.cpp                                    optional iokitcpp
++iokit/Kernel/arm/VivaCamera.cpp                                 optional iokitcpp
+ iokit/Kernel/arm/VivaWLAN.cpp                                    optional iokitcpp
+ iokit/Kernel/arm/VivaScaler.cpp                                  optional iokitcpp
+ iokit/Kernel/arm/VivaMDP.cpp                                     optional iokitcpp
+ iokit/Kernel/arm/VivaJPEGHW.cpp                                  optional iokitcpp

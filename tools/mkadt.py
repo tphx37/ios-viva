@@ -350,6 +350,15 @@ def viva_devices(ph, phandle, gic_ph, ecid):
             ('interrupt-parent', u32(gic_ph)),
             ('interrupts', spi(0x112, IRQ_LEVEL_HIGH) + spi(0x113, IRQ_LEVEL_HIGH) + spi(0x114, IRQ_LEVEL_HIGH)),
         ]),
+        # Camera stage 0. IOKit enumeration only; registers are described but never mapped/read.
+        # No GPIO, clock, I2C or regulator writes are permitted by the stage-0 driver.
+        node('camera-probe', [
+            ph(),
+            ('compatible', cstr('mediatek,mt6781-camera-probe')),
+            ('reg', io(0x1a000000, 0x1000) + io(0x1a04f000, 0x1000) +
+                    io(0x1a06f000, 0x1000)),
+            ('probe-only', u32(1)),
+        ]),
         # CONNSYS WiFi (MT6781 + MT6631): iokit/Kernel/arm/VivaWLAN.cpp (registry for configd / wifid) on top of
         # bsd/dev/viva_wifi.c + viva_wlan.c (the station, en0). launchd starts wifid only when a node named "wlan"
         # exists (_LimitLoadToDeviceTree); MobileGestalt reads local-mac-address here.
@@ -358,6 +367,19 @@ def viva_devices(ph, phandle, gic_ph, ecid):
             ('device_type', cstr('wlan')),
             ('compatible', cstr('mediatek,mt6781-wlan')),
             ('local-mac-address', wifi_mac(ecid)),
+        ]),
+        # MT6631 Bluetooth: the iOS 16.7.16 D22AP userland looks for a
+        # "bluetooth" IORegistry/DeviceTree entry, not /chosen's
+        # mac-address-bluetooth0 property (which only serves MobileGestalt).
+        # H4BC is the iPhone X userland transport. The logical speed is for
+        # the future HCI control-socket shim; the physical bus is MTK BTIF/STP.
+        node('bluetooth', [
+            ph(),
+            ('device_type', cstr('bluetooth')),
+            ('compatible', cstr('mediatek,mt6631-bluetooth')),
+            ('local-mac-address', bytes([0x02]) + struct.pack('>Q', ecid)[3:7] + b'\x02'),
+            ('transport-encoding', u32(3)),
+            ('transport-speed', u32(3000000)),
         ]),
     ]
 

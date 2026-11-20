@@ -43,6 +43,6 @@ mkdir -p shim/out
 python3 tools/mkadt.py shim/out/viva.adt "${ADT_FLAGS[@]}"
 python3 tools/mkpayload.py "$KERNEL" shim/out/viva.adt shim/out/viva-payload.bin --cmdline "$CMDLINE"
 # LK loads the ramdisk at 0x47c80000 and the DTB at 0x4bc80000: 64 MiB of room.
-size=$(stat -f %z shim/out/viva-payload.bin 2>/dev/null || stat -c %s shim/out/viva-payload.bin)
+size=$(stat -c %s shim/out/viva-payload.bin 2>/dev/null || stat -f %z shim/out/viva-payload.bin)
 [ "$size" -lt $((0x4bc80000 - 0x47c80000)) ] || { echo "error: payload ($size bytes) would overrun LK's DTB" >&2; exit 1; }
 shim/build-viva.sh "$STOCK" "$PWD/shim/out/viva-payload.bin"

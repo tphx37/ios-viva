@@ -1,0 +1,44 @@
+--- a/bsd/dev/viva_wifi.c
++++ b/bsd/dev/viva_wifi.c
+@@ -3583,8 +3583,10 @@
+ 	bool     attached, gaveUp;      /* gaveUp: attach failed or the line misbehaved, until "wifi opt irq 1" */
+ 	int      err;                   /* viva_wifi_irq_attach() */
+ 	uint32_t count, stray, missed;  /* interrupts, interrupts while masked, frames found by the safety timer */
+ 	uint32_t strayRun;
++	volatile uint32_t strayFirstSta, strayFirstMask;
++	volatile uint32_t strayLastSta, strayLastMask;
+ 	uint32_t wIrq, wTimer, wKick;   /* worker wakeups by cause */
+ 	uint32_t passes, passRx, rx, maxRx, tx;
+ 	uint64_t last;                  /* last pass with RX or TX */
+ } vi;
+@@ -3596,10 +3598,16 @@
+ 	if (!vi.armed) {
+ 		return false;
+ 	}
+ 	if (vi.masked) {
++		if (vi.strayRun == 0) {
++			vi.strayFirstSta = rd(WF_INT_STA);
++			vi.strayFirstMask = rd(WF_INT_MSK);
++		}
+ 		vi.stray++;                             /* asserted with INT_MSK 0: another source, if it goes on */
+ 		if (++vi.strayRun > 8) {
++			vi.strayLastSta = rd(WF_INT_STA);
++			vi.strayLastMask = rd(WF_INT_MSK);
+ 			vi.armed = false;
+ 			return false;
+ 		}
+ 		return true;
+@@ -3659,9 +3667,12 @@
+ static void
+ irq_pass(bool timerWake)
+ {
+ 	if (vi.mode && !vi.armed) {                     /* the handler gave the line up */
+-		printf("VIVA WIFI: WFDMA interrupt fired while masked (%u times), polling\n", vi.stray);
++		printf("VIVA WIFI: WFDMA interrupt fired while masked (%u times), polling; "
++		    "first STA 0x%08x MASK 0x%08x, last STA 0x%08x MASK 0x%08x\n",
++		    vi.stray, (unsigned)vi.strayFirstSta, (unsigned)vi.strayFirstMask,
++		    (unsigned)vi.strayLastSta, (unsigned)vi.strayLastMask);
+ 		irq_off();
+ 		vi.gaveUp = true;
+ 	}
+ 	if (vi.mode && timerWake && vi.count == 0 && vi.missed >= 32) {

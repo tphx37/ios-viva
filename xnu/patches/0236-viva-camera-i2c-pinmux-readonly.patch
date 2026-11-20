@@ -1,0 +1,69 @@
+diff --git a/iokit/Kernel/arm/VivaCamera.cpp b/iokit/Kernel/arm/VivaCamera.cpp
+--- a/iokit/Kernel/arm/VivaCamera.cpp
++++ b/iokit/Kernel/arm/VivaCamera.cpp
+@@ -67,15 +67,63 @@
+     if (args == NULL)
+         args = "";
+     while (*args == ' ')
+         args++;
+     if (*args == 0 || strcmp(args, "status") == 0) {
+-        snprintf(out, len, "cam: stage 1 ready; no sensor power, I2C or ISP access; run cam pins\n");
++        snprintf(out, len, "cam: stage 2 read-only; cam pins | cam buses; no sensor power, I2C or ISP access\n");
++        return;
++    }
++    if (strcmp(args, "buses") == 0) {
++        /*
++         * Pinmux-only survey. SCL/SDA GPIO identifiers and controller
++         * addresses come from the viva stock base DTB (mt6781).
++         * There are no I2C transfers, register writes, clock changes,
++         * pinmux changes, MMIO mappings or sensor power operations.
++         * A mode value cannot establish which bus contains the sensor.
++         */
++        VivaGPIO *gpio = VivaGPIO::wait();
++        if (gpio == NULL) {
++            snprintf(out, len, "cam: VivaGPIO not available\n");
++            return;
++        }
++        static const struct {
++            uint32_t phys, scl, sda;
++        } buses[] = {
++            { 0x11007000, 144, 145 },  /* i2c0 */
++            { 0x11008000, 146, 147 },  /* i2c1 */
++            { 0x11009000, 148, 149 },  /* i2c2 */
++            { 0x1100f000, 150, 151 },  /* i2c3 */
++            { 0x11011000, 152, 153 },  /* i2c4 */
++            { 0x11016000, 154, 155 },  /* i2c5 */
++            { 0x1100d000, 156, 157 },  /* i2c6 */
++            { 0x11004000, 158, 159 },  /* i2c7 */
++            { 0x11005000, 160, 161 },  /* i2c8 */
++            { 0x11019000, 162, 163 },  /* i2c9 */
++        };
++        size_t used = 0;
++        int n = snprintf(out, len,
++            "cam: I2C pinmux (SCL:mode/SDA:mode); routing unverified\n");
++        if (n < 0 || (size_t)n >= len)
++            return;
++        used = (size_t)n;
++        for (unsigned int i = 0; i < sizeof(buses) / sizeof(buses[0]); i++) {
++            uint32_t sclMode = 0, sdaMode = 0;
++            IOReturn a = gpio->getMode(buses[i].scl, &sclMode);
++            IOReturn b = gpio->getMode(buses[i].sda, &sdaMode);
++            n = snprintf(out + used, len - used,
++                " i2c%u@%08x %u:%u/%u:%u%s\n",
++                i, buses[i].phys, buses[i].scl, sclMode,
++                buses[i].sda, sdaMode,
++                (a == kIOReturnSuccess && b == kIOReturnSuccess) ? "" : " !");
++            if (n < 0 || (size_t)n >= len - used)
++                return;
++            used += (size_t)n;
++        }
+         return;
+     }
+     if (strcmp(args, "pins") != 0) {
+-        snprintf(out, len, "cam: usage: cam status | cam pins (read only)\n");
++        snprintf(out, len, "cam: usage: cam status | cam pins | cam buses (read only)\n");
+         return;
+     }
+ 
+     /* Only an explicit 'cam pins' triggers reads; no work in start(). */
+     VivaGPIO *gpio = VivaGPIO::wait();
