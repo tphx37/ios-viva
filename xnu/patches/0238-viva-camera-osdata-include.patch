@@ -1,0 +1,12 @@
+diff --git a/iokit/Kernel/arm/VivaCamera.cpp b/iokit/Kernel/arm/VivaCamera.cpp
+--- a/iokit/Kernel/arm/VivaCamera.cpp
++++ b/iokit/Kernel/arm/VivaCamera.cpp
+@@ -10,7 +10,7 @@
+ #if defined(SWEET)
+ #include <IOKit/IOLib.h>
+ #include <IOKit/IOService.h>
+-#include <libkern/OSData.h>
++#include <libkern/c++/OSData.h>
+ #include <libkern/libkern.h>
+ #include "VivaIO.h"
+ 
