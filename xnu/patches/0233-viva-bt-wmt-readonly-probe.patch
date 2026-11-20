@@ -1,0 +1,41 @@
+diff --git a/bsd/dev/viva_wifi.c b/bsd/dev/viva_wifi.c
+--- a/bsd/dev/viva_wifi.c
++++ b/bsd/dev/viva_wifi.c
+@@ -1988,11 +1988,36 @@
+ 	out[0] = 0;
+ 	while (*args == ' ') {
+ 		args++;
+ 	}
+ 	lck_mtx_lock(&vw_mtx);
+-	if (strncmp(args, "on", 2) == 0) {
++	if (strncmp(args, "btstat", 6) == 0) {
++		/* Read-only: no BTIF access, no CONNSYS state changes. */
++		say("bt: CONNSYS %s, WMT %s, STP %s, seq %u ack %u, RX queued %u/%u dropped %u\n",
++		    vw.on ? "on" : "off", vw.wmt ? "ready" : "not ready", st.full ? "full" : "mandatory",
++		    st.txseq, st.txack, stp_bt_rx.count, STP_BT_RX_DEPTH, stp_bt_rx.dropped);
++	} else if (strncmp(args, "btprobe", 7) == 0) {
++		/*
++		 * Explicit, bounded WMT status probe.  No BT power toggling or firmware
++		 * writes.  Reuses vw_mtx and the existing sole STP RX path, rather than
++		 * opening a competing BTIF reader.  STP/WMT support of opcode 0x17 on
++		 * this exact MT6631 firmware is not yet verified.
++		 */
++		if (!vw.on || !vw.wmt || !st.full) {
++			say("btprobe: Wi-Fi CONNSYS/WMT/STP is not initialized\n");
++		} else {
++			static const uint8_t sem[] = { 0x01, 0x17, 0x01, 0x00, 0x01 };
++			uint8_t ev[64] = { 0 };
++			int n = wmt_cmd("BT firmware semaphore", sem, sizeof(sem),
++			    NULL, 0, 40, ev, sizeof(ev), out, len, &o);
++			if (n >= 2 && ev[0] == 0x02 && ev[1] == 0x17) {
++				say("btprobe: WMT opcode 0x17 replied (raw status above)\n");
++			} else {
++				say("btprobe: no matching semaphore response; BT firmware status unknown\n");
++			}
++		}
++	} else if (strncmp(args, "on", 2) == 0) {
+ 		printf("VIVA WIFI: power on\n");
+ 		o = wifi_on(out, len, o);
+ 	} else if (strncmp(args, "wmt", 3) == 0) {
+ 		printf("VIVA WIFI: WMT over STP/BTIF\n");
+ 		o = wifi_wmt(out, len, o);

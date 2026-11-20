@@ -1,0 +1,44 @@
+diff --git a/bsd/dev/viva_wifi.c b/bsd/dev/viva_wifi.c
+--- a/bsd/dev/viva_wifi.c
++++ b/bsd/dev/viva_wifi.c
+@@ -673,4 +673,5 @@
+ #define INFRA_CG0_STA           0x10001090
+ #define INFRA_CG0_BTIF          (1u << 31)
++#define STP_TYPE_BT             0
+ #define STP_TYPE_WMT            4
+ 
+@@ -762,11 +763,20 @@
+ }
+ 
+-/* One WMT packet in the current STP mode (stp_core.c mtk_wcn_stp_send_data, mand / full). */
++/*
++ * Transmit one STP frame (12-bit payload length, 4-bit channel ID).
++ * Both WMT and Bluetooth share st.txseq/st.txack and the same BTIF registers.
++ * The caller must hold vw_mtx and must not run a second BTIF/STP reader.
++ * Bluetooth channel TX is deliberately unused until BT WMT power-on, firmware
++ * loading, and RX demultiplexing are implemented.
++ */
+ static bool
+-stp_send(const uint8_t *p, uint32_t n)
++stp_send_typed(uint8_t type, const uint8_t *p, uint32_t n)
+ {
++	if ((type != STP_TYPE_BT && type != STP_TYPE_WMT) || p == NULL || n == 0 || n > 0xfff) {
++		return false;
++	}
+ 	uint8_t h[4], c[2] = { 0, 0 };
+ 	h[0] = (uint8_t)(0x80 | (st.txseq << 3) | (st.full ? st.txack : 0));
+-	h[1] = (uint8_t)((STP_TYPE_WMT << 4) | ((n >> 8) & 0xf));
++	h[1] = (uint8_t)((type << 4) | ((n >> 8) & 0xf));
+ 	h[2] = (uint8_t)n;
+ 	h[3] = st.full ? (uint8_t)(h[0] + h[1] + h[2]) : 0;
+@@ -780,3 +790,10 @@
+ }
+ 
++/* Preserve the existing WMT send path unchanged. */
++static bool
++stp_send(const uint8_t *p, uint32_t n)
++{
++	return stp_send_typed(STP_TYPE_WMT, p, n);
++}
++
+ /* Next STP data frame (ack-only frames skipped; full mode: acknowledged). Payload into out, length returned, <0 none. */

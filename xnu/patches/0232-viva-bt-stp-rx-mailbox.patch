@@ -1,0 +1,101 @@
+diff --git a/bsd/dev/viva_wifi.c b/bsd/dev/viva_wifi.c
+--- a/bsd/dev/viva_wifi.c
++++ b/bsd/dev/viva_wifi.c
+@@ -791,6 +791,26 @@
+ {
+ 	return stp_send_typed(STP_TYPE_WMT, p, n);
+ }
++
++/*
++ * Bluetooth STP receive mailbox.  The STP header has a 12-bit payload length,
++ * so one slot can hold a complete packet, including an H:4 type byte if the
++ * controller supplies one.  This is only a staging queue: a later HCI worker
++ * must poll the shared BTIF while holding vw_mtx and drain this mailbox.
++ *
++ * All stp_recv()/mailbox operations are currently performed with vw_mtx held
++ * by the Wi-Fi worker / command path.  Do not add an independent BTIF reader.
++ */
++#define STP_BT_RX_DEPTH           8
++#define STP_BT_RX_CAP            0xfff
++static struct {
++	struct {
++		uint16_t len;
++		uint8_t data[STP_BT_RX_CAP];
++	} slot[STP_BT_RX_DEPTH];
++	uint8_t head, tail, count;
++	uint32_t dropped;
++} stp_bt_rx;
+ 
+ /* Next STP data frame (ack-only frames skipped; full mode: acknowledged). Payload into out, length returned, <0 none. */
+ static int
+@@ -809,27 +829,67 @@
+ 		if (n == 0) {
+ 			continue;                       /* an acknowledgement */
+ 		}
++		uint8_t frame_type = (uint8_t)(b1 >> 4);
++		bool bt_frame = frame_type == STP_TYPE_BT;
++		bool save_bt = bt_frame && stp_bt_rx.count < STP_BT_RX_DEPTH;
++		uint8_t bt_index = stp_bt_rx.tail;
+ 		uint32_t got = 0;
+ 		for (uint32_t i = 0; i < n + 2; i++) {
+ 			int v = btif_get(20000);
+ 			if (v < 0) {
+ 				return -2;
+ 			}
+-			if (i < n && got < max) {
+-				out[got++] = (uint8_t)v;
++			if (i < n) {
++				if (save_bt) {
++					stp_bt_rx.slot[bt_index].data[i] = (uint8_t)v;
++				} else if (!bt_frame && got < max) {
++					out[got++] = (uint8_t)v;
++				}
+ 			}
+ 		}
+ 		if (type) {
+-			*type = (uint8_t)(b1 >> 4);
++			*type = frame_type;
+ 		}
+ 		if (st.full) {
+ 			st.txack = (uint8_t)((b0 >> 3) & 7);
+ 			st.rxseq = (st.txack + 1) & 7;
+ 			stp_ack();
+ 		}
++		if (bt_frame) {
++			if (save_bt) {
++				stp_bt_rx.slot[bt_index].len = (uint16_t)n;
++				stp_bt_rx.tail = (uint8_t)((bt_index + 1) % STP_BT_RX_DEPTH);
++				stp_bt_rx.count++;
++			} else {
++				stp_bt_rx.dropped++;
++			}
++			continue; /* never return a Bluetooth frame as a WMT reply */
++		}
+ 		return (int)got;
+ 	}
+ 	return -3;
+ }
+ 
++/*
++ * For the future HCI bridge.  The caller MUST already hold vw_mtx: the
++ * mailbox is owned by the same worker as STP/BTIF, not a second reader.
++ * Zero = no frame, negative = buffer too small or invalid output pointer.
++ */
++int
++viva_bt_stp_pop_locked(uint8_t *out, uint32_t cap)
++{
++	if (!stp_bt_rx.count) {
++		return 0;
++	}
++	uint8_t idx = stp_bt_rx.head;
++	uint32_t n = stp_bt_rx.slot[idx].len;
++	if (out == NULL || cap < n) {
++		return -1;
++	}
++	memcpy(out, stp_bt_rx.slot[idx].data, n);
++	stp_bt_rx.head = (uint8_t)((idx + 1) % STP_BT_RX_DEPTH);
++	stp_bt_rx.count--;
++	return (int)n;
++}
++
+ /* WMT command -> its event (02 opcode ...); the event bytes are compared with `want` (wlen bytes) if given. */
