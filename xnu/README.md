@@ -1,10 +1,5 @@
-# XNU for sweet
+# XNU builds
 
-Built on GitHub's macOS arm64 runners by `.github/workflows/xnu.yml`, using
-[blacktop/darwin-xnu-build](https://github.com/blacktop/darwin-xnu-build) (MIT) at a pinned commit.
+The `.github/workflows/xnu.yml` workflow builds the SWEET-config XNU kernel with the repository's ordered `patches/*.patch` and staging scripts, using [blacktop/darwin-xnu-build](https://github.com/blacktop/darwin-xnu-build). Viva uses this shared configuration plus MediaTek-specific patches; `sweet` and `viva` refer to different devices.
 
-- `MACOS_VERSION=13.5` -> xnu-8796 (same generation as iOS 16.6/16.7, the last iOS for iPhone 8).
-- `patches/*.patch` are copied into the build script's patch dir and applied to the xnu tree with `git apply`.
-- Output: `kernel.<config>.vmapple` (later: our own SWEET machine config) as a workflow artifact.
-
-Fetch the latest build: `gh run download -R dipa-studio/ios-sweet -n xnu-kernel -D xnu/out`
+The workflow produces an `xnu-kernel` artifact. Select the correct repository, branch and run explicitly when using `gh run download`; the upstream ios-sweet repository does not contain this Viva branch. See [VIVA.md](../VIVA.md) for history and [NOTES.md](../NOTES.md) for current build and device status. A committed patch is not evidence of a successful CI build or boot.

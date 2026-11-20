@@ -2,7 +2,7 @@
 
 **Apple's iOS 16 running on a Redmi Note 11 Pro 4G.**
 
-ios-viva ports Apple's open-source XNU kernel (xnu-8796, the iOS 16 generation) to the Xiaomi Redmi Note 11 Pro 4G (`viva`, MediaTek Helio G96 / MT6781). The **unmodified iOS 16.7.16 (20H392) userland of the iPhone X** runs on top of it, from launchd to SpringBoard and the stock apps. It is a fork of [ios-sweet](https://github.com/dipa-studio/ios-sweet), which did the same for the Redmi Note 10 Pro. The boot shim, the patch series and the tooling come from there. This branch adds the MediaTek drivers next to them.
+ios-viva ports Apple's open-source XNU kernel (xnu-8796, the iOS 16 generation) to the Xiaomi Redmi Note 11 Pro 4G (`viva`, MediaTek Helio G96 / MT6781). An iOS 16.7.16 (20H392) userland derived from the iPhone X, with port-specific configuration and components, runs on top of it, from launchd to SpringBoard and the stock apps. It is a fork of [ios-sweet](https://github.com/dipa-studio/ios-sweet), which did the same for the Redmi Note 10 Pro. The boot shim, the patch series and the tooling come from there. This branch adds the MediaTek drivers next to them.
 
 Graphics are hardware accelerated. Metal, and with it CoreAnimation, SpringBoard, Safari and the apps, runs on the phone's Mali-G57 MC2 through a separate driver project:
 
@@ -14,17 +14,19 @@ Graphics are hardware accelerated. Metal, and with it CoreAnimation, SpringBoard
 
 | Area | State |
 | --- | --- |
-| Boot | Stock MediaTek LK → our shim in `boot_b` → XNU. Only `boot_b` and `userdata` are ever written |
+| Boot | Stock MediaTek LK → shim → XNU. Earlier Viva procedures used `boot_b`; check the current device state before any boot or flash |
 | CPU | All 8 cores (6× Cortex-A55 + 2× Cortex-A76) via PSCI, with our own DVFS ([below](#dvfs-cpu-and-gpu-clocks-under-load)) |
 | Memory | About 5.5 GiB, including the RAM between the SoC carve-outs |
 | Storage | MediaTek UFS on LUN 2; the iOS root is an HFS+ volume in `userdata`, read/write |
 | GPU | Mali-G57 MC2 kernel driver (`VivaGPUAccelerator`), Metal through [viva-gpu](https://github.com/Nik300/viva-gpu) |
-| Display | 1080×2400 DSC panel at 60 or 120 Hz, direct scanout of GPU surfaces, brightness and Night Shift |
+| Display | 1080×2400 DSC panel, direct scanout, brightness and Night Shift. A recent snapshot measured ~60 Hz even with 120 Hz mode configured |
 | Input | Goodix GT9896 touch, power and volume keys (MT6366 PMIC) |
 | Power | Battery gauge, charger, Low Power Mode, RTC, panel sleep, shutdown and restart |
 | Other | Wi-Fi (experimental, CONNSYS), hardware JPEG encoder, MDP scaler, USB link to a host (`tools/viva-link.py`) |
 
-Not working: cellular, Bluetooth, audio, camera, sensors, GPS, Face ID / SEP. There is no App Store or Apple ID.
+Audio output and haptics have been exercised on earlier builds (see [VIVA.md](VIVA.md)); their current state requires a fresh device check. Cellular, Bluetooth, camera, sensors, GPS and Face ID / SEP remain incomplete. There is no App Store or Apple ID.
+
+The 2026-11-21 diagnostic snapshot found Wi-Fi connected but falling back to polling after an IRQ storm. Bluetooth and camera patches exist in source; their functionality on the currently booted kernel has not been established. Source commits, CI builds and device boot results are separate milestones; see [NOTES.md](NOTES.md) for the current handoff.
 
 ## DVFS: CPU and GPU clocks under load
 
@@ -70,16 +72,11 @@ Over the link, `cpu` and `gpu dvfs` print the current OPPs, load, temperatures, 
 
 ## Building and booting
 
-The full procedure, device facts and a log of every patch are in **[VIVA.md](VIVA.md)**. In short:
+The engineering history and earlier procedures are in **[VIVA.md](VIVA.md)**; the current handoff is in **[NOTES.md](NOTES.md)**. The kernel is built by `.github/workflows/xnu.yml`; the iOS root is prepared separately from an iPhone X 16.7.16 IPSW. The GPU driver bundle is built and installed separately: [viva-gpu](https://github.com/Nik300/viva-gpu).
 
-```sh
-gh workflow run xnu.yml -R YOU/ios-viva --ref viva          # kernel (GitHub Actions, macOS runner)
-gh run download RUN_ID -R YOU/ios-viva -n xnu-kernel -D xnu/out
-tools/viva-mkboot.sh xnu/out/kernel.development.sweet STOCK/boot.img ufs-rw
-fastboot flash boot_b shim/out/viva-boot.img && fastboot reboot
-```
+Historical flash commands in this repository are records of earlier experiments, not instructions to run blindly. Confirm the exact target, backups and each destructive operation with the device owner before writing any partition. Preserve bootloaders, recovery, modem, persist and backups. The current project instructions call for temporary boot images during bring-up. Do not push to the upstream `origin` without authorization.
 
-The iOS root is built on macOS from the iPhone X 16.7.16 IPSW (`tools/viva-mkiosroot-macos.sh`) and flashed into `userdata`. The GPU driver bundle is built and installed separately, see [viva-gpu](https://github.com/Nik300/viva-gpu).
+Local Apple artifacts, device images and private logs live outside this repository in `../ios-assets/` and `../diagnostics-private/`; they are not distributed here. Keep them and device identifiers out of Git.
 
 ## Repository layout
 
@@ -89,7 +86,7 @@ The iOS root is built on macOS from the iPhone X 16.7.16 IPSW (`tools/viva-mkios
 | `shim/` | Boot shim; `shim/viva.c` and `build-viva.sh` for this phone |
 | `tools/` | ADT generator (`mkadt.py --viva`), boot image and root image builders, USB link host (`viva-link.py`) |
 | `VIVA.md` | Device facts, build steps and the per-patch engineering log for viva |
-| `NOTES.md` | ios-sweet's original engineering log |
+| `NOTES.md` | Current Viva handoff followed by the historical ios-sweet log |
 
 ## Credits
 
