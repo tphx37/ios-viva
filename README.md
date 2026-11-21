@@ -2,7 +2,7 @@
 
 **Apple's iOS 16 running on a Redmi Note 11 Pro 4G.**
 
-ios-viva ports Apple's open-source XNU kernel (xnu-8796, the iOS 16 generation) to the Xiaomi Redmi Note 11 Pro 4G (`viva`, MediaTek Helio G96 / MT6781). An iOS 16.7.16 (20H392) userland derived from the iPhone X, with port-specific configuration and components, runs on top of it, from launchd to SpringBoard and the stock apps. It is a fork of [ios-sweet](https://github.com/dipa-studio/ios-sweet), which did the same for the Redmi Note 10 Pro. The boot shim, the patch series and the tooling come from there. This branch adds the MediaTek drivers next to them.
+ios-viva ports Apple's open-source XNU kernel (xnu-8796, the iOS 16 generation) to the Xiaomi Redmi Note 11 Pro 4G (`viva`, MediaTek Helio G96 / MT6781). An iOS 16.7.16 (20H392) userland derived from the iPhone X, with port-specific configuration and components, runs on top of it, from launchd to SpringBoard and the stock apps. It builds on [Nik300/ios-viva](https://github.com/Nik300/ios-viva), a Viva port of [ios-sweet](https://github.com/dipa-studio/ios-sweet) for the Redmi Note 10 Pro. The boot shim, patch series and tooling originate in those projects.
 
 Graphics are hardware accelerated. Metal, and with it CoreAnimation, SpringBoard, Safari and the apps, runs on the phone's Mali-G57 MC2 through a separate driver project:
 
@@ -90,4 +90,4 @@ Local Apple artifacts, device images and private logs live outside this reposito
 
 ## Credits
 
-Built on [ios-sweet](https://github.com/dipa-studio/ios-sweet) by dipa-studio, Apple's open-source releases (xnu, IOHIDFamily, libpthread, hfs), [BearSSL](https://bearssl.org), [blacktop/darwin-xnu-build](https://github.com/blacktop/darwin-xnu-build) and [ipsw](https://github.com/blacktop/ipsw), and on Xiaomi's published `viva` Linux kernel sources for the hardware details. iOS itself is Apple's and is not distributed here.
+Built on [ios-viva](https://github.com/Nik300/ios-viva) by Nik300 and [ios-sweet](https://github.com/dipa-studio/ios-sweet) by dipa-studio, Apple's open-source releases (xnu, IOHIDFamily, libpthread, hfs), [BearSSL](https://bearssl.org), [blacktop/darwin-xnu-build](https://github.com/blacktop/darwin-xnu-build) and [ipsw](https://github.com/blacktop/ipsw), and on Xiaomi's published `viva` Linux kernel sources for the hardware details. iOS itself is Apple's and is not distributed here.

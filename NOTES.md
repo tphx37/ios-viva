@@ -9,6 +9,7 @@ This repository targets Redmi Note 11 Pro 4G (`viva`, MT6781). The `sweet` notes
 - `../ios-assets/` holds local images, IPSW-derived files, handoff material and logs; preserve it outside Git. `../diagnostics-private/` holds private diagnostics. Existing uncommitted source and tools are user work.
 - Device policy: temporary boot images for bring-up; confirm each destructive step with the user. The user previously approved using existing `userdata` for iOS, without GPT changes. Preserve bootloaders, recovery, modem, persist and backups.
 
+- Repository audit: GitHub `tphx37/ios-viva` default branch changed from `main` to `viva`; description corrected to Redmi Note 11 Pro 4G. `main` was retained. The XNU workflow still triggers on push to `main` only; dispatch can target `viva`. No CI run or device boot was performed. `tools/validate-repo.py` reports 10 numbering gaps in the existing patch series; Python and shell syntax checks passed. Gaps alone do not establish a broken patch stack. Existing uncommitted source/tools remain untouched.
 - Documentation cleanup: replaced the obsolete Italian GPU proposal with an English overview; removed the local-only status and workflow drafts from `docs/`, retained the QEMU guide with its sweet-only scope, and labeled the USB contract as historical. No build, CI run or device boot was performed for this cleanup.
 
 ---
